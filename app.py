@@ -43,15 +43,22 @@ def run_download_and_separate(job_id, youtube_url):
     try:
         jobs[job_id] = {"status": "downloading", "progress": 0, "message": "Downloading audio..."}
         
-        # Download audio
-        output_file = os.path.join(app.config['UPLOAD_FOLDER'], f"{job_id}.mp3")
+        # Create output directory
+        upload_dir = Path(app.config['UPLOAD_FOLDER'])
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Download audio with full path
         download_cmd = [
-            "python", "download_audio.py",
+            sys.executable, "download_audio.py",
             youtube_url,
-            "-o", app.config['UPLOAD_FOLDER']
+            "-o", str(upload_dir)
         ]
         
-        result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=600)
+        logger.info(f"Running download: {' '.join(download_cmd)}")
+        result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=600, cwd=os.getcwd())
+        
+        logger.info(f"Download stdout: {result.stdout}")
+        logger.info(f"Download stderr: {result.stderr}")
         
         if result.returncode != 0:
             jobs[job_id] = {
@@ -60,25 +67,33 @@ def run_download_and_separate(job_id, youtube_url):
             }
             return
         
-        # Find the downloaded file
-        uploaded_files = list(Path(app.config['UPLOAD_FOLDER']).glob("*.mp3"))
+        # Find the downloaded file - search more thoroughly
+        uploaded_files = list(upload_dir.glob("**/*.mp3"))
+        
         if not uploaded_files:
+            logger.error(f"No MP3 found. Contents of {upload_dir}: {list(upload_dir.glob('*'))}")
             jobs[job_id] = {"status": "error", "message": "No audio file found after download"}
             return
         
-        audio_file = str(uploaded_files[0])
+        # Use the most recently modified file
+        audio_file = str(max(uploaded_files, key=lambda p: p.stat().st_mtime))
+        logger.info(f"Found audio file: {audio_file}")
         
         # Separate audio
         jobs[job_id] = {"status": "separating", "progress": 50, "message": "Separating audio..."}
         
         separate_cmd = [
-            "python", "separate_audio.py",
+            sys.executable, "separate_audio.py",
             audio_file,
             "-o", app.config['SEPARATED_FOLDER'],
             "-m", "mdx"  # Lighter model for cloud deployment
         ]
         
-        result = subprocess.run(separate_cmd, capture_output=True, text=True, timeout=600)
+        logger.info(f"Running separation: {' '.join(separate_cmd)}")
+        result = subprocess.run(separate_cmd, capture_output=True, text=True, timeout=600, cwd=os.getcwd())
+        
+        logger.info(f"Separation stdout: {result.stdout}")
+        logger.info(f"Separation stderr: {result.stderr}")
         
         if result.returncode != 0:
             jobs[job_id] = {
@@ -88,7 +103,7 @@ def run_download_and_separate(job_id, youtube_url):
             return
         
         # Find separated files
-        separated_dir = Path(app.config['SEPARATED_FOLDER']) / "htdemucs"
+        separated_dir = Path(app.config['SEPARATED_FOLDER']) / "mdx"
         
         stems = {}
         for stem_dir in separated_dir.iterdir():
@@ -107,8 +122,10 @@ def run_download_and_separate(job_id, youtube_url):
         
     except subprocess.TimeoutExpired:
         jobs[job_id] = {"status": "error", "message": "Processing timeout - file may be too long"}
+        logger.error(f"Timeout for job {job_id}")
     except Exception as e:
         jobs[job_id] = {"status": "error", "message": f"Error: {str(e)}"}
+        logger.error(f"Error in job {job_id}: {str(e)}", exc_info=True)
 
 
 @app.route('/health', methods=['GET'])
