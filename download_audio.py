@@ -26,7 +26,7 @@ def download_audio(url, output_dir="downloads"):
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
-    # Configure yt-dlp options with explicit output format
+    # Configure yt-dlp options with headers to bypass rate limiting
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -34,16 +34,38 @@ def download_audio(url, output_dir="downloads"):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        'outtmpl': str(output_path / '%(title)s'),  # Don't include extension - yt-dlp adds it
+        'outtmpl': str(output_path / '%(title)s'),
         'quiet': False,
         'no_warnings': False,
         'progress_hooks': [progress_hook],
+        # Add headers to look like a real browser
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        # Retry on temporary failures
+        'socket_timeout': 30,
+        'retries': 3,
+        'fragment_retries': 3,
+        # Use IPv4 only (sometimes IPv6 has issues)
+        'socket_timeout': 30,
+        # Disable SSL verification if needed
+        'no_check_certificate': False,
     }
     
     try:
         print(f"Downloading audio from: {url}")
+        print("(This may take a minute...)")
+        
         with YoutubeDL(ydl_opts) as ydl:
+            # Extract video info first to ensure we can access it
+            print("Fetching video information...")
+            info = ydl.extract_info(url, download=False)
+            print(f"Found video: {info.get('title', 'Unknown')}")
+            
+            # Now download
+            print("Downloading...")
             info = ydl.extract_info(url, download=True)
+            
             # Get the actual filename that was created
             base_name = ydl.prepare_filename(info)
             mp3_name = Path(base_name).stem + ".mp3"
@@ -63,7 +85,18 @@ def download_audio(url, output_dir="downloads"):
                     print(f"✗ Error: File not found at {audio_path}", file=sys.stderr)
                     return None
     except Exception as e:
-        print(f"✗ Error downloading audio: {e}", file=sys.stderr)
+        error_msg = str(e)
+        print(f"✗ Error downloading audio: {error_msg}", file=sys.stderr)
+        
+        # Provide helpful error messages
+        if "HTTP Error 429" in error_msg:
+            print("\n💡 Tip: YouTube is blocking requests. Try:", file=sys.stderr)
+            print("  1. Wait a few minutes and try again", file=sys.stderr)
+            print("  2. Try a different video", file=sys.stderr)
+            print("  3. The video might be region-restricted or age-gated", file=sys.stderr)
+        elif "unable to download" in error_msg.lower():
+            print("\n💡 Tip: The video might not exist or be private", file=sys.stderr)
+        
         return None
 
 
