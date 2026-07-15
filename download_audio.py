@@ -6,8 +6,10 @@ Downloads audio from YouTube URLs and saves as MP3
 
 import os
 import sys
+import re
 import time
 import json
+import hashlib
 import argparse
 from pathlib import Path
 from yt_dlp import YoutubeDL
@@ -18,7 +20,7 @@ def download_audio(url, output_dir="downloads"):
     Download audio from a YouTube URL and save as MP3
     
     Args:
-        url (str): YouTube URL
+        url (str): YouTube URL (supports youtube.com, youtu.be, and music.youtube.com)
         output_dir (str): Directory to save the audio file
     
     Returns:
@@ -28,12 +30,23 @@ def download_audio(url, output_dir="downloads"):
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
+    # Convert YouTube Music URLs to regular YouTube format for better extraction
+    if 'music.youtube.com' in url:
+        print("🎵 Converting YouTube Music URL to regular YouTube...")
+        # Extract video ID from music.youtube.com URL
+        match = re.search(r'v=([a-zA-Z0-9_-]{11})', url)
+        if match:
+            video_id = match.group(1)
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            print(f"Converted to: {url}")
+        else:
+            print("⚠️ Warning: Could not parse YouTube Music URL, proceeding anyway...")
+    
     # Check cache first to avoid repeated YouTube requests
     cache_dir = Path("cache")
     cache_dir.mkdir(exist_ok=True)
     
     # Create cache key from URL
-    import hashlib
     cache_key = hashlib.md5(url.encode()).hexdigest()
     cache_file = cache_dir / f"{cache_key}.json"
     
@@ -43,12 +56,12 @@ def download_audio(url, output_dir="downloads"):
                 cache_data = json.load(f)
                 cached_path = cache_data.get('path')
                 if cached_path and Path(cached_path).exists():
-                    print(f"Using cached download: {Path(cached_path).name}")
+                    print(f"✓ Using cached download: {Path(cached_path).name}")
                     return cached_path
         except:
             pass  # Ignore cache errors, proceed with download
     
-    # Configure yt-dlp options with enhanced bot bypass
+    # Configure yt-dlp options with enhanced bot bypass and YouTube Music support
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -74,13 +87,24 @@ def download_audio(url, output_dir="downloads"):
         'socket_timeout': 30,
         'retries': 10,  # More retries with longer waits
         'fragment_retries': 10,
-        # Wait between retries (will use exponential backoff)
+        # Default search and compatibility options
         'default_search': 'ytsearch',
-        # Use deno for JavaScript extraction
         'compat_opts': {'youtube.skip_unavailable_videos': True},
         # Network optimization
         'noprogress': False,
         'no_color': False,
+        # YouTube extractor args for robust extraction
+        'extractor_args': {
+            'youtube': {
+                'lang': ['en'],  # Prefer English metadata
+                'skip': ['dash'],  # Skip DASH format (less reliable)
+            },
+            'youtubemusic': {  # Support YouTube Music
+                'skip': ['dash'],
+            },
+        },
+        # Add age-restricted video handling
+        'youtube_include_dash_manifest': False,
     }
     
     # Retry loop with exponential backoff
@@ -179,10 +203,17 @@ def download_audio(url, output_dir="downloads"):
                     print("  4. Your ISP may be flagged - try via mobile hotspot", file=sys.stderr)
                 elif "HTTP Error 429" in error_msg:
                     print("\n💡 YouTube is rate limiting. Wait 1+ hour before trying again.", file=sys.stderr)
-                elif "unavailable" in error_msg.lower():
+                elif "unavailable" in error_msg.lower() or "not available" in error_msg.lower():
                     print("\n💡 The video might be private, deleted, or region-restricted", file=sys.stderr)
-                elif "unable to download" in error_msg.lower():
-                    print("\n💡 The video exists but cannot be downloaded (DRM or restrictions)", file=sys.stderr)
+                    print("  Note: YouTube Music content sometimes requires special handling", file=sys.stderr)
+                elif "unable to download" in error_msg.lower() or "no formats" in error_msg.lower():
+                    print("\n💡 The video cannot be downloaded (DRM, age-gate, or music content)", file=sys.stderr)
+                    print("  Tip: YouTube Music URLs may have restrictions. Try a different song", file=sys.stderr)
+                elif "youtubemusic" in error_msg.lower():
+                    print("\n💡 YouTube Music extraction failed. This URL might:", file=sys.stderr)
+                    print("  1. Be region-restricted", file=sys.stderr)
+                    print("  2. Have licensing restrictions", file=sys.stderr)
+                    print("  3. Try searching for the song on regular YouTube instead", file=sys.stderr)
             
             return None
     
