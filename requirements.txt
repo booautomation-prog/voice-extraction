@@ -1,0 +1,6 @@
+yt-dlp>=2024.1.0
+demucs>=4.0.0
+torch>=2.0.0
+torchaudio>=2.0.0
+flask>=2.3.0
+gunicorn>=21.0.0

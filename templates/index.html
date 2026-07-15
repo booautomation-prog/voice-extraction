@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Extraction Studio</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🎵 Voice Extraction Studio</h1>
+            <p class="subtitle">Separate vocals, drums & instruments</p>
+        </header>
+
+        <!-- Input Section -->
+        <section class="input-section">
+            <div class="form-group">
+                <label for="youtube-url">YouTube URL</label>
+                <input 
+                    type="text" 
+                    id="youtube-url" 
+                    placeholder="https://www.youtube.com/watch?v=..." 
+                    class="input-field"
+                >
+                <button id="download-btn" class="btn btn-primary">Download & Separate</button>
+            </div>
+        </section>
+
+        <!-- Status Section -->
+        <section id="status-section" class="status-section hidden">
+            <div class="status-card">
+                <h3>Processing...</h3>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <p id="status-message" class="status-message">Initializing...</p>
+            </div>
+        </section>
+
+        <!-- Playback Section -->
+        <section id="playback-section" class="playback-section hidden">
+            <h2>Audio Stems</h2>
+            <p class="section-subtitle">Select channels to play/preview</p>
+            
+            <div class="stems-grid">
+                <!-- Vocals -->
+                <div class="stem-card">
+                    <div class="stem-header">
+                        <h3>🎤 Vocals</h3>
+                        <label class="checkbox">
+                            <input type="checkbox" class="stem-toggle" data-stem="vocals" checked>
+                            <span class="toggle-label">Enable</span>
+                        </label>
+                    </div>
+                    <audio id="vocals-player" class="stem-player" controls>
+                        <source type="audio/wav">
+                    </audio>
+                    <button class="btn btn-secondary" onclick="downloadStem('vocals')">Download</button>
+                </div>
+
+                <!-- Drums -->
+                <div class="stem-card">
+                    <div class="stem-header">
+                        <h3>🥁 Drums</h3>
+                        <label class="checkbox">
+                            <input type="checkbox" class="stem-toggle" data-stem="drums" checked>
+                            <span class="toggle-label">Enable</span>
+                        </label>
+                    </div>
+                    <audio id="drums-player" class="stem-player" controls>
+                        <source type="audio/wav">
+                    </audio>
+                    <button class="btn btn-secondary" onclick="downloadStem('drums')">Download</button>
+                </div>
+
+                <!-- Bass -->
+                <div class="stem-card">
+                    <div class="stem-header">
+                        <h3>🎸 Bass</h3>
+                        <label class="checkbox">
+                            <input type="checkbox" class="stem-toggle" data-stem="bass" checked>
+                            <span class="toggle-label">Enable</span>
+                        </label>
+                    </div>
+                    <audio id="bass-player" class="stem-player" controls>
+                        <source type="audio/wav">
+                    </audio>
+                    <button class="btn btn-secondary" onclick="downloadStem('bass')">Download</button>
+                </div>
+
+                <!-- Other -->
+                <div class="stem-card">
+                    <div class="stem-header">
+                        <h3>✨ Other</h3>
+                        <label class="checkbox">
+                            <input type="checkbox" class="stem-toggle" data-stem="other" checked>
+                            <span class="toggle-label">Enable</span>
+                        </label>
+                    </div>
+                    <audio id="other-player" class="stem-player" controls>
+                        <source type="audio/wav">
+                    </audio>
+                    <button class="btn btn-secondary" onclick="downloadStem('other')">Download</button>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="resetApp()">Process Another Song</button>
+            </div>
+        </section>
+
+        <!-- Error Section -->
+        <section id="error-section" class="error-section hidden">
+            <div class="error-card">
+                <h3>❌ Error</h3>
+                <p id="error-message"></p>
+                <button class="btn btn-primary" onclick="resetApp()">Try Again</button>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
