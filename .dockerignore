@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+.git
+.gitignore
+*.mp3
+*.wav
+*.webm
+downloads/
+uploads/
+separated/
+.env
+.DS_Store
+venv/
+.vscode/
+.idea/
+README_NEW.md
