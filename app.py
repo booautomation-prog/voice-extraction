@@ -75,7 +75,7 @@ def run_download_and_separate(job_id, youtube_url):
             "python", "separate_audio.py",
             audio_file,
             "-o", app.config['SEPARATED_FOLDER'],
-            "-m", "htdemucs"
+            "-m", "mdx"  # Lighter model for cloud deployment
         ]
         
         result = subprocess.run(separate_cmd, capture_output=True, text=True, timeout=600)
