@@ -67,17 +67,31 @@ def run_download_and_separate(job_id, youtube_url):
             }
             return
         
-        # Find the downloaded file - search more thoroughly
-        uploaded_files = list(upload_dir.glob("**/*.mp3"))
+        # Try to find the downloaded file
+        audio_file = None
         
-        if not uploaded_files:
+        # First, try to extract from stdout if script printed the path
+        if result.stdout:
+            for line in result.stdout.split('\n'):
+                if line.startswith('/') or (len(line) > 2 and line[1] == ':'):  # Unix or Windows path
+                    path_candidate = Path(line.strip())
+                    if path_candidate.exists() and path_candidate.suffix == '.mp3':
+                        audio_file = str(path_candidate)
+                        logger.info(f"Found file from stdout: {audio_file}")
+                        break
+        
+        # If not found, search directory
+        if not audio_file:
+            uploaded_files = list(upload_dir.glob("**/*.mp3"))
+            if uploaded_files:
+                audio_file = str(max(uploaded_files, key=lambda p: p.stat().st_mtime))
+                logger.info(f"Found file from directory search: {audio_file}")
+        
+        if not audio_file:
             logger.error(f"No MP3 found. Contents of {upload_dir}: {list(upload_dir.glob('*'))}")
             jobs[job_id] = {"status": "error", "message": "No audio file found after download"}
             return
         
-        # Use the most recently modified file
-        audio_file = str(max(uploaded_files, key=lambda p: p.stat().st_mtime))
-        logger.info(f"Found audio file: {audio_file}")
         
         # Separate audio
         jobs[job_id] = {"status": "separating", "progress": 50, "message": "Separating audio..."}
