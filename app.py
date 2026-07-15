@@ -16,6 +16,10 @@ import threading
 import uuid
 import logging
 
+# Suppress warnings
+os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
+os.environ['PYTHONWARNINGS'] = 'ignore'
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

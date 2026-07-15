@@ -6,10 +6,17 @@ Separates audio into vocals, drums, bass, and other instruments using Demucs
 
 import os
 import sys
-import argparse
 from pathlib import Path
 import subprocess
 import json
+
+# Suppress Hugging Face warnings
+os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
+os.environ['PYTHONWARNINGS'] = 'ignore'
+
+# Set cache directory
+cache_dir = Path.home() / '.cache' / 'demucs'
+cache_dir.mkdir(parents=True, exist_ok=True)
 
 
 def separate_audio(audio_path, output_dir="separated", model="htdemucs"):
