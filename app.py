@@ -14,6 +14,11 @@ import json
 from datetime import datetime
 import threading
 import uuid
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size
@@ -106,6 +111,12 @@ def run_download_and_separate(job_id, youtube_url):
         jobs[job_id] = {"status": "error", "message": f"Error: {str(e)}"}
 
 
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint"""
+    return jsonify({"status": "healthy", "app": "Voice Extraction Studio"}), 200
+
+
 @app.route('/')
 def index():
     """Serve main page"""
@@ -171,5 +182,19 @@ def stream_stem(job_id, stem_name):
     return send_file(file_path, mimetype='audio/wav')
 
 
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors"""
+    return jsonify({"error": "Not found"}), 404
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 errors"""
+    logger.error(f"Internal error: {error}")
+    return jsonify({"error": "Internal server error"}), 500
+
+
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
