@@ -59,7 +59,8 @@ def run_download_and_separate(job_id, youtube_url):
         ]
         
         logger.info(f"Running download: {' '.join(download_cmd)}")
-        result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=600, cwd=os.getcwd())
+        # Increased timeout to 15 minutes (900s) for exponential backoff retries
+        result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=900, cwd=os.getcwd())
         
         logger.info(f"Download stdout: {result.stdout}")
         logger.info(f"Download stderr: {result.stderr}")

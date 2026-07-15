@@ -39,4 +39,5 @@ EXPOSE 5000
 ENV FLASK_APP=app.py
 
 # Run with gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "300", "--workers", "1", "--max-requests", "100", "app:app"]
+# Increased timeout to 900s (15 minutes) for YouTube retries with exponential backoff
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "900", "--workers", "1", "--max-requests", "100", "app:app"]
