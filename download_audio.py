@@ -40,16 +40,16 @@ def download_audio(url, output_dir="downloads"):
         'progress_hooks': [progress_hook],
         # Add headers to look like a real browser
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
         },
+        # Use deno for JavaScript extraction (required by YouTube)
+        'compat_opts': {'youtube.skip_unavailable_videos': True},
         # Retry on temporary failures
         'socket_timeout': 30,
-        'retries': 3,
-        'fragment_retries': 3,
-        # Use IPv4 only (sometimes IPv6 has issues)
-        'socket_timeout': 30,
-        # Disable SSL verification if needed
-        'no_check_certificate': False,
+        'retries': 5,
+        'fragment_retries': 5,
+        'extractor_args': {'youtube': {'skip': ['hls', 'dash']}},
     }
     
     try:
