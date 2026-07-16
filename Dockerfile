@@ -18,8 +18,10 @@ RUN curl -fsSL https://deno.land/x/install/install.sh | sh && \
 # Copy requirements
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install CPU-only PyTorch first so Railway does not pull CUDA/GPU wheels.
 RUN python -m pip install --no-cache-dir --upgrade pip && \
+    python -m pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
+        torch==2.3.1+cpu torchaudio==2.3.1+cpu && \
     python -m pip install --no-cache-dir -r requirements.txt
 
 # Copy app code

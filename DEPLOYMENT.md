@@ -6,7 +6,8 @@ The recommended online path is Docker deployment on Railway, Render, Fly.io, or 
 
 ## What Is Already Prepared
 
-- `Dockerfile` installs FFmpeg, Deno, Python dependencies, and preloads the `mdx` Demucs model when possible.
+- `Dockerfile` installs FFmpeg, Deno, Python dependencies, and preloads the configured Demucs model when possible.
+- Docker installs CPU-only PyTorch wheels; Railway should not pull CUDA packages for this app.
 - `railway.toml` tells Railway to build with Docker and use `/health` as the health check.
 - `app.py` uses one Gunicorn worker and in-memory job state.
 - The web app can process either a YouTube URL or a directly uploaded audio file.
