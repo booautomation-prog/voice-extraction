@@ -4,6 +4,10 @@ Simple Python tools for downloading audio from YouTube and separating vocals, dr
 
 ## Quick Start
 
+### Portable Windows Copy
+
+To copy this project to another Windows computer, see [PORTABLE_WINDOWS.md](PORTABLE_WINDOWS.md).
+
 ### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt

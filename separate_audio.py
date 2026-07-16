@@ -6,6 +6,7 @@ Separates audio into vocals, drums, bass, and other instruments using Demucs
 
 import os
 import sys
+import argparse
 from pathlib import Path
 import subprocess
 import json
@@ -13,10 +14,36 @@ import json
 # Suppress Hugging Face warnings
 os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'
 os.environ['PYTHONWARNINGS'] = 'ignore'
+os.environ['PYTHONUTF8'] = '1'
+os.environ['PYTHONIOENCODING'] = 'utf-8'
 
-# Set cache directory
-cache_dir = Path.home() / '.cache' / 'demucs'
-cache_dir.mkdir(parents=True, exist_ok=True)
+
+def configure_output_encoding():
+    """Keep Windows consoles and subprocess pipes from crashing on status symbols."""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
+configure_output_encoding()
+
+
+def add_packaged_ffmpeg_to_path():
+    """Expose imageio-ffmpeg's binary to Demucs when system FFmpeg is absent."""
+    try:
+        import imageio_ffmpeg
+
+        ffmpeg_dir = str(Path(imageio_ffmpeg.get_ffmpeg_exe()).parent)
+        os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
+    except Exception:
+        pass
+
+
+add_packaged_ffmpeg_to_path()
 
 
 def separate_audio(audio_path, output_dir="separated", model="htdemucs"):
@@ -110,6 +137,7 @@ def main():
     )
     parser.add_argument(
         'audio_file',
+        nargs='?',
         help='Audio file to separate'
     )
     parser.add_argument(
@@ -136,7 +164,10 @@ def main():
         for model, description in list_models().items():
             print(f"  {model:20} - {description}")
         return 0
-    
+
+    if not args.audio_file:
+        parser.error("audio_file is required unless --list-models is used")
+
     if not os.path.exists(args.audio_file):
         print(f"✗ Error: Audio file '{args.audio_file}' not found", file=sys.stderr)
         return 1

@@ -4,6 +4,10 @@ Simple Python script to download audio from YouTube URLs and convert to MP3.
 
 ## Setup
 
+### Portable Windows Setup
+
+To copy this project to another Windows computer, see [PORTABLE_WINDOWS.md](PORTABLE_WINDOWS.md).
+
 ### 1. Install FFmpeg
 The script requires FFmpeg to convert audio formats.
 

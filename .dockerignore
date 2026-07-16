@@ -2,6 +2,11 @@ __pycache__
 *.pyc
 .git
 .gitignore
+.venv/
+venv/
+cache/
+model_cache/
+flask_server.*.log
 *.mp3
 *.wav
 *.webm
@@ -10,7 +15,6 @@ uploads/
 separated/
 .env
 .DS_Store
-venv/
 .vscode/
 .idea/
 README_NEW.md

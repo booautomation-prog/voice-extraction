@@ -1,118 +1,79 @@
-# Cloud Deployment Guide
+# Online Deployment Guide
 
-This guide helps you deploy the Voice Extraction web app to the cloud so you can access it from mobile devices.
+Voice Extraction Studio needs a real backend server. It cannot be hosted as a static site because it runs `yt-dlp`, FFmpeg, PyTorch, and Demucs.
 
-## Option 1: Deploy to Railway (Recommended - Easiest)
+The recommended online path is Docker deployment on Railway, Render, Fly.io, or a VPS. Railway is the default target for this project because `Dockerfile` and `railway.toml` are included.
 
-### Prerequisites
-- GitHub account
-- Railway account (free tier available at [railway.app](https://railway.app))
+## What Is Already Prepared
 
-### Steps
+- `Dockerfile` installs FFmpeg, Deno, Python dependencies, and preloads the `mdx` Demucs model when possible.
+- `railway.toml` tells Railway to build with Docker and use `/health` as the health check.
+- `app.py` uses one Gunicorn worker and in-memory job state.
+- Old generated files are cleaned automatically using:
+  - `CLEANUP_MAX_AGE_HOURS`, default `6`
+  - `CLEANUP_INTERVAL_SECONDS`, default `1800`
+- The active Demucs model is controlled with `DEMUCS_MODEL`, default `mdx`.
 
-1. **Push your code to GitHub:**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin https://github.com/YOUR_USERNAME/voice-extraction.git
-   git push -u origin main
+## Deploy To Railway
+
+1. Push this project to a GitHub repository.
+
+2. Open Railway and create a new project from the GitHub repository.
+
+3. Railway should detect the `Dockerfile`. The included `railway.toml` also sets the builder to Docker.
+
+4. After deploy, open the generated Railway domain.
+
+5. Check health:
+
+   ```text
+   https://YOUR-APP.up.railway.app/health
    ```
 
-2. **Deploy on Railway:**
-   - Go to [railway.app](https://railway.app)
-   - Click "New Project"
-   - Select "Deploy from GitHub repo"
-   - Connect your GitHub account and select your repository
-   - Railway will auto-detect the Flask app and deploy it
+## Suggested Railway Settings
 
-3. **Configure Environment:**
-   - In Railway dashboard, add variables if needed
-   - Set up custom domain for easy access
+Use a paid/resource-capable service for real separation work. Demucs is CPU and memory heavy, and free/small instances may timeout or restart.
 
-4. **Access from Mobile:**
-   - Once deployed, Railway gives you a URL like `your-app.railway.app`
-   - Visit this URL on your mobile phone
-   - Bookmark it for quick access
+Suggested environment variables:
 
-## Option 2: Deploy to Heroku (Requires Credit Card)
-
-### Prerequisites
-- Heroku account ([heroku.com](https://heroku.com))
-- Heroku CLI installed
-
-### Steps
-
-1. **Create Procfile:**
-   ```bash
-   echo "web: gunicorn app:app" > Procfile
-   ```
-
-2. **Deploy:**
-   ```bash
-   heroku login
-   heroku create your-app-name
-   git push heroku main
-   ```
-
-3. **Access:**
-   - Visit `your-app-name.herokuapp.com` from mobile
-
-## Option 3: Run Locally & Access from Mobile (Advanced)
-
-### Prerequisites
-- Same network (home WiFi or hotspot)
-
-### Steps
-
-1. **Find your computer's IP:**
-   ```powershell
-   ipconfig | findstr /i "IPv4"
-   ```
-   Look for something like `192.168.x.x`
-
-2. **Run the app:**
-   ```bash
-   python app.py
-   ```
-
-3. **On mobile phone:**
-   - Connect to same WiFi
-   - Open browser and go to: `http://YOUR_IP_ADDRESS:5000`
-   - Port forward if accessing outside your network
-
-## Limitations & Notes
-
-⚠️ **Important:** The free tiers on Railway/Heroku have limitations:
-- Model downloads (~200-500MB) on first run
-- Processing takes 1-2 minutes per song
-- Temporary files need cleanup
-
-**For production use, consider:**
-- Using a paid tier with more resources
-- Pre-downloading models
-- Implementing job queue system (Celery/Redis)
-- Using async processing
-
-## Troubleshooting
-
-**"Model not found":**
-- First run downloads the Demucs model (~500MB)
-- Subsequent runs are faster
-
-**"Timeout":**
-- Long songs may timeout on free tiers
-- Try with shorter songs first
-
-**"Storage limit":**
-- Railway/Heroku have limited storage
-- Implement automatic cleanup of old files
-
-## Environment Variables (Optional)
-
-Create a `.env` file for production:
+```text
+DEMUCS_MODEL=mdx
+CLEANUP_MAX_AGE_HOURS=6
+CLEANUP_INTERVAL_SECONDS=1800
+PYTHONUTF8=1
+PYTHONIOENCODING=utf-8
 ```
-FLASK_ENV=production
-MAX_UPLOAD_SIZE=500
-CLEANUP_INTERVAL=3600
+
+## Local Docker Test
+
+If Docker is installed:
+
+```powershell
+docker build -t voice-extraction .
+docker run --rm -p 5000:5000 voice-extraction
 ```
+
+Then open:
+
+```text
+http://127.0.0.1:5000
+```
+
+## Important Limits
+
+- The first build/run can take a while because PyTorch and Demucs are large.
+- The Docker image can become large after model caching.
+- YouTube may occasionally block or rate-limit cloud IP addresses.
+- Generated audio files are temporary and will be deleted by cleanup.
+- With the current in-memory job state, keep Gunicorn at one worker.
+
+## If You Need A Stronger Online Version
+
+For heavier public use, the next architecture should split the app into:
+
+- Flask web frontend/API
+- Background worker for separation jobs
+- Redis or database for job state
+- Persistent object storage for stems
+
+The current version is good for personal or small private use online.

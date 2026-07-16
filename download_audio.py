@@ -12,7 +12,53 @@ import json
 import hashlib
 import argparse
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit, urlunsplit, urlencode
 from yt_dlp import YoutubeDL
+
+
+def configure_output_encoding():
+    """Keep Windows consoles and subprocess pipes from crashing on emoji text."""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
+configure_output_encoding()
+
+
+def normalize_youtube_url(url):
+    """Convert YouTube Music/playlist URLs into a single-video YouTube URL."""
+    parsed = urlsplit(url)
+    host = parsed.netloc.lower()
+
+    if "youtube.com" in host and parsed.path == "/watch":
+        query = parse_qs(parsed.query)
+        video_ids = query.get("v")
+        if video_ids:
+            clean_query = urlencode({"v": video_ids[0]})
+            return urlunsplit(("https", "www.youtube.com", "/watch", clean_query, ""))
+
+    if host == "youtu.be":
+        video_id = parsed.path.strip("/").split("/")[0]
+        if video_id:
+            clean_query = urlencode({"v": video_id})
+            return urlunsplit(("https", "www.youtube.com", "/watch", clean_query, ""))
+
+    return url
+
+
+def find_ffmpeg_location():
+    """Use system FFmpeg or a Python-packaged FFmpeg binary when available."""
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
 
 
 def download_audio(url, output_dir="downloads"):
@@ -30,17 +76,10 @@ def download_audio(url, output_dir="downloads"):
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     
-    # Convert YouTube Music URLs to regular YouTube format for better extraction
-    if 'music.youtube.com' in url:
-        print("🎵 Converting YouTube Music URL to regular YouTube...")
-        # Extract video ID from music.youtube.com URL
-        match = re.search(r'v=([a-zA-Z0-9_-]{11})', url)
-        if match:
-            video_id = match.group(1)
-            url = f"https://www.youtube.com/watch?v={video_id}"
-            print(f"Converted to: {url}")
-        else:
-            print("⚠️ Warning: Could not parse YouTube Music URL, proceeding anyway...")
+    clean_url = normalize_youtube_url(url)
+    if clean_url != url:
+        print(f"Using single-video URL: {clean_url}")
+        url = clean_url
     
     # Check cache first to avoid repeated YouTube requests
     cache_dir = Path("cache")
@@ -61,6 +100,8 @@ def download_audio(url, output_dir="downloads"):
         except:
             pass  # Ignore cache errors, proceed with download
     
+    ffmpeg_location = find_ffmpeg_location()
+
     # Configure yt-dlp options with enhanced bot bypass and YouTube Music support
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -69,10 +110,11 @@ def download_audio(url, output_dir="downloads"):
             'preferredcodec': 'mp3',
             'preferredquality': '192',
         }],
-        'outtmpl': str(output_path / '%(title)s'),
+        'outtmpl': str(output_path / '%(title)s.%(ext)s'),
         'quiet': False,
         'no_warnings': False,
         'progress_hooks': [progress_hook],
+        'noplaylist': True,
         # Enhanced browser headers (looks like Chrome on Windows)
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
@@ -106,9 +148,13 @@ def download_audio(url, output_dir="downloads"):
         # Add age-restricted video handling
         'youtube_include_dash_manifest': False,
     }
+
+    if ffmpeg_location:
+        ydl_opts['ffmpeg_location'] = ffmpeg_location
     
     # Retry loop with exponential backoff
     max_retries = 3
+    certificate_retry_used = False
     for attempt in range(max_retries):
         try:
             print(f"Downloading audio from: {url}")
@@ -172,6 +218,15 @@ def download_audio(url, output_dir="downloads"):
         except Exception as e:
             error_msg = str(e)
             print(f"Attempt {attempt + 1}/{max_retries} failed: {error_msg[:100]}", file=sys.stderr)
+
+            if "CERTIFICATE_VERIFY_FAILED" in error_msg and not certificate_retry_used:
+                certificate_retry_used = True
+                ydl_opts['nocheckcertificate'] = True
+                print(
+                    "Local SSL certificate verification failed; retrying once without certificate verification.",
+                    file=sys.stderr
+                )
+                continue
             
             # Check for bot verification error
             if "Sign in to confirm you're not a bot" in error_msg or "bot" in error_msg.lower():
@@ -270,6 +325,7 @@ def main():
         result = download_audio(args.url, args.output)
         if not result:
             return 1
+        print(result)
     
     return 0
 
