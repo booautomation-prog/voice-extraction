@@ -1,10 +1,13 @@
 // Global state
 let currentJobId = null;
 const STEMS = ['vocals', 'drums', 'bass', 'other'];
+const ALLOWED_AUDIO_EXTENSIONS = ['mp3', 'wav', 'm4a', 'webm', 'ogg', 'flac', 'aac'];
 
 // DOM Elements
 const urlInput = document.getElementById('youtube-url');
 const downloadBtn = document.getElementById('download-btn');
+const audioFileInput = document.getElementById('audio-file');
+const uploadBtn = document.getElementById('upload-btn');
 const statusSection = document.getElementById('status-section');
 const playbackSection = document.getElementById('playback-section');
 const errorSection = document.getElementById('error-section');
@@ -14,9 +17,19 @@ const errorMessage = document.getElementById('error-message');
 
 // Event Listeners
 downloadBtn.addEventListener('click', handleDownload);
+uploadBtn.addEventListener('click', handleUpload);
 urlInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') handleDownload();
 });
+
+async function getApiError(response, fallbackMessage) {
+    try {
+        const data = await response.json();
+        return data.error || fallbackMessage;
+    } catch (error) {
+        return fallbackMessage;
+    }
+}
 
 // Handle Download
 async function handleDownload() {
@@ -32,8 +45,7 @@ async function handleDownload() {
         return;
     }
 
-    downloadBtn.disabled = true;
-    urlInput.disabled = true;
+    setControlsDisabled(true);
 
     showStatus();
     hideError();
@@ -50,21 +62,68 @@ async function handleDownload() {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to start processing');
+            throw new Error(await getApiError(response, 'Failed to start processing'));
         }
 
         const data = await response.json();
         currentJobId = data.job_id;
 
         // Poll for status
-        await pollStatus();
+        pollStatus();
 
     } catch (error) {
         console.error('Error:', error);
         showError(error.message || 'An error occurred. Please try again.');
-    } finally {
-        downloadBtn.disabled = false;
-        urlInput.disabled = false;
+        setControlsDisabled(false);
+    }
+}
+
+// Handle Upload
+async function handleUpload() {
+    const file = audioFileInput.files[0];
+
+    if (!file) {
+        showError('Please choose an audio file');
+        return;
+    }
+
+    const extension = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+    if (!ALLOWED_AUDIO_EXTENSIONS.includes(extension)) {
+        showError(`Unsupported audio file. Use one of: ${ALLOWED_AUDIO_EXTENSIONS.join(', ')}`);
+        return;
+    }
+
+    if (file.size > 500 * 1024 * 1024) {
+        showError('Audio file is too large. Maximum size is 500 MB.');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('audio', file);
+
+    setControlsDisabled(true);
+    showStatus();
+    hideError();
+    hidePlayback();
+
+    try {
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(await getApiError(response, 'Failed to upload audio'));
+        }
+
+        const data = await response.json();
+        currentJobId = data.job_id;
+        pollStatus();
+
+    } catch (error) {
+        console.error('Upload error:', error);
+        showError(error.message || 'An error occurred. Please try again.');
+        setControlsDisabled(false);
     }
 }
 
@@ -85,8 +144,10 @@ async function pollStatus() {
 
         if (data.status === 'completed') {
             onProcessingComplete(data);
+            setControlsDisabled(false);
         } else if (data.status === 'error') {
             showError(data.message || 'An error occurred');
+            setControlsDisabled(false);
         } else {
             // Continue polling
             setTimeout(pollStatus, 1000);
@@ -95,6 +156,7 @@ async function pollStatus() {
     } catch (error) {
         console.error('Error polling status:', error);
         showError('Connection error. Please try again.');
+        setControlsDisabled(false);
     }
 }
 
@@ -171,8 +233,8 @@ async function downloadStem(stemName) {
 function resetApp() {
     currentJobId = null;
     urlInput.value = '';
-    urlInput.disabled = false;
-    downloadBtn.disabled = false;
+    audioFileInput.value = '';
+    setControlsDisabled(false);
     progressFill.style.width = '0%';
 
     hideStatus();
@@ -194,6 +256,13 @@ function resetApp() {
 }
 
 // UI Helpers
+function setControlsDisabled(disabled) {
+    urlInput.disabled = disabled;
+    downloadBtn.disabled = disabled;
+    audioFileInput.disabled = disabled;
+    uploadBtn.disabled = disabled;
+}
+
 function showStatus() {
     statusSection.classList.remove('hidden');
     hidePlayback();

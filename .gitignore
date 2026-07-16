@@ -20,5 +20,6 @@ model_cache/
 flask_server.*.log
 cloudflared.exe
 cloudflared.*.log
+railway_login.*.log
 .vscode/
 .idea/

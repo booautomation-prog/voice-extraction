@@ -9,6 +9,7 @@ The recommended online path is Docker deployment on Railway, Render, Fly.io, or 
 - `Dockerfile` installs FFmpeg, Deno, Python dependencies, and preloads the `mdx` Demucs model when possible.
 - `railway.toml` tells Railway to build with Docker and use `/health` as the health check.
 - `app.py` uses one Gunicorn worker and in-memory job state.
+- The web app can process either a YouTube URL or a directly uploaded audio file.
 - Old generated files are cleaned automatically using:
   - `CLEANUP_MAX_AGE_HOURS`, default `6`
   - `CLEANUP_INTERVAL_SECONDS`, default `1800`
@@ -63,7 +64,7 @@ http://127.0.0.1:5000
 
 - The first build/run can take a while because PyTorch and Demucs are large.
 - The Docker image can become large after model caching.
-- YouTube may occasionally block or rate-limit cloud IP addresses.
+- YouTube may occasionally block or rate-limit cloud IP addresses. Use direct audio upload when that happens.
 - Generated audio files are temporary and will be deleted by cleanup.
 - With the current in-memory job state, keep Gunicorn at one worker.
 

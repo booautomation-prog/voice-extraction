@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
+from werkzeug.utils import secure_filename
 import subprocess
 from datetime import datetime, timedelta
 import threading
@@ -36,6 +37,8 @@ Path(app.config['SEPARATED_FOLDER']).mkdir(exist_ok=True)
 
 # Store job status
 jobs = {}
+
+ALLOWED_AUDIO_EXTENSIONS = {'.mp3', '.wav', '.m4a', '.webm', '.ogg', '.flac', '.aac'}
 
 
 def child_process_env():
@@ -73,7 +76,10 @@ def process_error_message(label, result):
         )
 
     if "Sign in to confirm" in details or "not a bot" in details:
-        return f"{label} failed: YouTube is asking for bot verification. Try another video or wait before retrying."
+        return (
+            f"{label} failed: YouTube is asking for bot verification on this cloud server. "
+            "Upload the audio file instead, or try another video later."
+        )
 
     if "HTTP Error 429" in details or "Too Many Requests" in details:
         return f"{label} failed: YouTube is rate limiting this connection. Wait and try again later."
@@ -88,6 +94,19 @@ def process_error_message(label, result):
 def generate_job_id():
     """Generate unique job ID"""
     return str(uuid.uuid4())[:8]
+
+
+def is_allowed_audio_file(filename):
+    """Return True when an uploaded filename looks like a supported audio file."""
+    return Path(filename).suffix.lower() in ALLOWED_AUDIO_EXTENSIONS
+
+
+def safe_uploaded_audio_name(job_id, filename):
+    """Build a filesystem-safe upload name while preserving the audio extension."""
+    suffix = Path(filename).suffix.lower()
+    safe_name = secure_filename(filename)
+    safe_stem = Path(safe_name).stem or "audio"
+    return f"{job_id}_{safe_stem}{suffix}"
 
 
 def cleanup_old_files():
@@ -127,6 +146,63 @@ def cleanup_loop():
 
 cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
 cleanup_thread.start()
+
+
+def run_separate_audio(job_id, audio_file, progress=50):
+    """Separate a local audio file and update job status with generated stems."""
+    jobs[job_id] = {"status": "separating", "progress": progress, "message": "Separating audio..."}
+
+    model_name = app.config['MODEL_NAME']
+    separate_cmd = [
+        sys.executable, "separate_audio.py",
+        audio_file,
+        "-o", app.config['SEPARATED_FOLDER'],
+        "-m", model_name
+    ]
+
+    logger.info(f"Running separation: {' '.join(separate_cmd)}")
+    result = subprocess.run(
+        separate_cmd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=600,
+        cwd=os.getcwd(),
+        env=child_process_env()
+    )
+
+    logger.info(f"Separation stdout: {result.stdout}")
+    logger.info(f"Separation stderr: {result.stderr}")
+
+    if result.returncode != 0:
+        jobs[job_id] = {
+            "status": "error",
+            "message": process_error_message("Separation", result)
+        }
+        return
+
+    separated_dir = Path(app.config['SEPARATED_FOLDER']) / model_name / Path(audio_file).stem
+
+    stems = {}
+    if not separated_dir.exists():
+        jobs[job_id] = {
+            "status": "error",
+            "message": "Separated audio folder was not created"
+        }
+        return
+
+    for wav_file in separated_dir.glob("*.wav"):
+        stem_name = wav_file.stem
+        stems[stem_name] = str(wav_file)
+
+    jobs[job_id] = {
+        "status": "completed",
+        "progress": 100,
+        "message": "Successfully separated audio!",
+        "stems": stems,
+        "original_file": audio_file
+    }
 
 
 def run_download_and_separate(job_id, youtube_url):
@@ -200,62 +276,7 @@ def run_download_and_separate(job_id, youtube_url):
             jobs[job_id] = {"status": "error", "message": "No audio file found after download"}
             return
         
-        
-        # Separate audio
-        jobs[job_id] = {"status": "separating", "progress": 50, "message": "Separating audio..."}
-        
-        model_name = app.config['MODEL_NAME']
-        separate_cmd = [
-            sys.executable, "separate_audio.py",
-            audio_file,
-            "-o", app.config['SEPARATED_FOLDER'],
-            "-m", model_name  # Lighter model for cloud deployment
-        ]
-        
-        logger.info(f"Running separation: {' '.join(separate_cmd)}")
-        result = subprocess.run(
-            separate_cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=600,
-            cwd=os.getcwd(),
-            env=child_process_env()
-        )
-        
-        logger.info(f"Separation stdout: {result.stdout}")
-        logger.info(f"Separation stderr: {result.stderr}")
-        
-        if result.returncode != 0:
-            jobs[job_id] = {
-                "status": "error",
-                "message": process_error_message("Separation", result)
-            }
-            return
-        
-        # Find separated files
-        separated_dir = Path(app.config['SEPARATED_FOLDER']) / model_name / Path(audio_file).stem
-        
-        stems = {}
-        if not separated_dir.exists():
-            jobs[job_id] = {
-                "status": "error",
-                "message": "Separated audio folder was not created"
-            }
-            return
-
-        for wav_file in separated_dir.glob("*.wav"):
-            stem_name = wav_file.stem
-            stems[stem_name] = str(wav_file)
-        
-        jobs[job_id] = {
-            "status": "completed",
-            "progress": 100,
-            "message": "Successfully separated audio!",
-            "stems": stems,
-            "original_file": audio_file
-        }
+        run_separate_audio(job_id, audio_file, progress=50)
         
     except subprocess.TimeoutExpired:
         jobs[job_id] = {"status": "error", "message": "Processing timeout - file may be too long"}
@@ -263,6 +284,19 @@ def run_download_and_separate(job_id, youtube_url):
     except Exception as e:
         jobs[job_id] = {"status": "error", "message": f"Error: {str(e)}"}
         logger.error(f"Error in job {job_id}: {str(e)}", exc_info=True)
+
+
+def run_upload_and_separate(job_id, audio_file):
+    """Separate an already uploaded audio file."""
+    try:
+        cleanup_old_files()
+        run_separate_audio(job_id, audio_file, progress=10)
+    except subprocess.TimeoutExpired:
+        jobs[job_id] = {"status": "error", "message": "Processing timeout - file may be too long"}
+        logger.error(f"Timeout for job {job_id}")
+    except Exception as e:
+        jobs[job_id] = {"status": "error", "message": f"Error: {str(e)}"}
+        logger.error(f"Error in uploaded job {job_id}: {str(e)}", exc_info=True)
 
 
 @app.route('/health', methods=['GET'])
@@ -300,6 +334,36 @@ def download():
     thread.daemon = True
     thread.start()
     
+    return jsonify({"job_id": job_id})
+
+
+@app.route('/api/upload', methods=['POST'])
+def upload_audio():
+    """Start separation job from an uploaded audio file."""
+    uploaded_file = request.files.get('audio')
+
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify({"error": "No audio file uploaded"}), 400
+
+    if not is_allowed_audio_file(uploaded_file.filename):
+        allowed = ", ".join(sorted(ext.lstrip('.') for ext in ALLOWED_AUDIO_EXTENSIONS))
+        return jsonify({"error": f"Unsupported audio file. Use one of: {allowed}"}), 400
+
+    job_id = generate_job_id()
+    upload_dir = Path(app.config['UPLOAD_FOLDER'])
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    audio_path = upload_dir / safe_uploaded_audio_name(job_id, uploaded_file.filename)
+    uploaded_file.save(audio_path)
+
+    jobs[job_id] = {"status": "queued", "progress": 0, "message": "Upload received..."}
+
+    thread = threading.Thread(
+        target=run_upload_and_separate,
+        args=(job_id, str(audio_path))
+    )
+    thread.daemon = True
+    thread.start()
+
     return jsonify({"job_id": job_id})
 
 
