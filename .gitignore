@@ -17,6 +17,7 @@ cache/
 venv/
 .venv/
 model_cache/
+model_repo/
 flask_server.*.log
 cloudflared.exe
 cloudflared.*.log

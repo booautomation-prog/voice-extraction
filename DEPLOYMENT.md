@@ -14,6 +14,7 @@ The recommended online path is Docker deployment on Railway, Render, Fly.io, or 
   - `CLEANUP_MAX_AGE_HOURS`, default `6`
   - `CLEANUP_INTERVAL_SECONDS`, default `1800`
 - The active Demucs model is controlled with `DEMUCS_MODEL`, default `mdx`.
+- Demucs model files are cached into `DEMUCS_MODEL_REPO` during Docker build.
 
 ## Deploy To Railway
 
@@ -39,6 +40,12 @@ Suggested environment variables:
 
 ```text
 DEMUCS_MODEL=mdx
+DEMUCS_MODEL_REPO=/app/model_repo
+DEMUCS_SHIFTS=0
+DEMUCS_SEGMENT=20
+DEMUCS_OVERLAP=0.1
+DEMUCS_JOBS=0
+SEPARATION_TIMEOUT_SECONDS=1200
 CLEANUP_MAX_AGE_HOURS=6
 CLEANUP_INTERVAL_SECONDS=1800
 PYTHONUTF8=1
@@ -64,6 +71,7 @@ http://127.0.0.1:5000
 
 - The first build/run can take a while because PyTorch and Demucs are large.
 - The Docker image can become large after model caching.
+- Model downloads happen during Docker build. If model caching fails, the deploy should fail instead of surprising users during separation.
 - YouTube may occasionally block or rate-limit cloud IP addresses. Use direct audio upload when that happens.
 - Generated audio files are temporary and will be deleted by cleanup.
 - With the current in-memory job state, keep Gunicorn at one worker.

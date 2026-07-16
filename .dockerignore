@@ -6,6 +6,7 @@ __pycache__
 venv/
 cache/
 model_cache/
+model_repo/
 flask_server.*.log
 *.mp3
 *.wav

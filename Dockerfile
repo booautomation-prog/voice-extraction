@@ -31,6 +31,12 @@ ENV HF_HOME=/app/model_cache/huggingface
 ENV TORCH_HOME=/app/model_cache/torch
 ENV XDG_CACHE_HOME=/app/model_cache
 ENV DEMUCS_MODEL=mdx
+ENV DEMUCS_MODEL_REPO=/app/model_repo
+ENV DEMUCS_SHIFTS=0
+ENV DEMUCS_SEGMENT=20
+ENV DEMUCS_OVERLAP=0.1
+ENV DEMUCS_JOBS=0
+ENV SEPARATION_TIMEOUT_SECONDS=1200
 ENV CLEANUP_MAX_AGE_HOURS=6
 ENV CLEANUP_INTERVAL_SECONDS=1800
 ENV PYTHONUNBUFFERED=1
@@ -38,9 +44,10 @@ ENV PYTHONUTF8=1
 ENV PYTHONIOENCODING=utf-8
 ENV PATH="/root/.deno/bin:$PATH"
 
-# Pre-download the demucs model during build
-RUN mkdir -p /app/model_cache/huggingface /app/model_cache/torch && \
-    python -c "from demucs.pretrained import get_model; get_model('mdx')" || echo "Model caching attempted"
+# Pre-download the Demucs model during build so public jobs do not hit
+# Hugging Face or remote model downloads at runtime.
+RUN mkdir -p /app/model_cache/huggingface /app/model_cache/torch /app/model_repo && \
+    python cache_demucs_model.py "$DEMUCS_MODEL" "$DEMUCS_MODEL_REPO"
 
 # Expose port
 EXPOSE 5000

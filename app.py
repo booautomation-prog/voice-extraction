@@ -84,6 +84,18 @@ def process_error_message(label, result):
     if "HTTP Error 429" in details or "Too Many Requests" in details:
         return f"{label} failed: YouTube is rate limiting this connection. Wait and try again later."
 
+    if "stopped by signal 9" in details or "exceeded memory limits" in details:
+        return (
+            f"{label} failed: Railway stopped the separation process because it likely exceeded "
+            "the service memory limit. Try a shorter audio file or use a stronger Railway plan."
+        )
+
+    if "HF_TOKEN" in details or "HF Hub" in details:
+        return (
+            f"{label} failed: the Demucs model could not be loaded from the model cache. "
+            "Redeploy the app so the model is cached during build."
+        )
+
     lines = [line.strip() for line in details.splitlines() if line.strip()]
     if "Traceback (most recent call last)" in details and lines:
         return f"{label} failed: {lines[-1]}"
@@ -167,7 +179,7 @@ def run_separate_audio(job_id, audio_file, progress=50):
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=600,
+        timeout=int(os.environ.get('SEPARATION_TIMEOUT_SECONDS', '1200')),
         cwd=os.getcwd(),
         env=child_process_env()
     )
