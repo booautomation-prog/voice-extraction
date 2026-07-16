@@ -107,8 +107,8 @@ def separate_audio(audio_path, output_dir="separated", model="htdemucs"):
             cmd.extend(["--repo", str(repo_path)])
 
         shifts = optional_env_int("DEMUCS_SHIFTS", 0)
-        segment = optional_env_int("DEMUCS_SEGMENT", 5)
-        overlap = optional_env_float("DEMUCS_OVERLAP", 0.1)
+        segment = optional_env_int("DEMUCS_SEGMENT", 1)
+        overlap = optional_env_float("DEMUCS_OVERLAP", 0)
         jobs = optional_env_int("DEMUCS_JOBS", 0)
 
         if shifts is not None:
