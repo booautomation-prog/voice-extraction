@@ -29,7 +29,7 @@ app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['SEPARATED_FOLDER'] = 'separated'
 app.config['CLEANUP_MAX_AGE_HOURS'] = int(os.environ.get('CLEANUP_MAX_AGE_HOURS', '6'))
-app.config['MODEL_NAME'] = os.environ.get('DEMUCS_MODEL', 'mdx')
+app.config['MODEL_NAME'] = os.environ.get('DEMUCS_MODEL', '0d19c1c6')
 
 # Create folders
 Path(app.config['UPLOAD_FOLDER']).mkdir(exist_ok=True)

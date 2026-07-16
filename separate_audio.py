@@ -183,6 +183,7 @@ def print_stem_info(output_dir, audio_stem):
 def list_models():
     """List available Demucs models."""
     return {
+        "0d19c1c6": "Cloud default - single MDX model, lower memory",
         "htdemucs": "Recommended - best quality, higher complexity",
         "mdx": "Faster, good quality",
         "mdx_extra": "Highest quality, slowest",
@@ -205,8 +206,7 @@ def main():
         "-m",
         "--model",
         default="htdemucs",
-        choices=["htdemucs", "mdx", "mdx_extra", "htdemucs_ft"],
-        help="Model to use (default: htdemucs)",
+        help="Model name or signature to use (default: htdemucs)",
     )
     parser.add_argument("--list-models", action="store_true", help="List models and exit")
 
