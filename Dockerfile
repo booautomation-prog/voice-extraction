@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Install system dependencies including deno for JavaScript extraction
 RUN apt-get update && apt-get install -y \
+    build-essential \
     ca-certificates \
     ffmpeg \
     git \
