@@ -183,7 +183,8 @@ def print_stem_info(output_dir, audio_stem):
 def list_models():
     """List available Demucs models."""
     return {
-        "0d19c1c6": "Cloud default - single MDX model, lower memory",
+        "6b9c2ca1": "Cloud default - quantized single MDX model, lowest memory",
+        "0d19c1c6": "Single MDX model, lower memory",
         "htdemucs": "Recommended - best quality, higher complexity",
         "mdx": "Faster, good quality",
         "mdx_extra": "Highest quality, slowest",

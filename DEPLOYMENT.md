@@ -14,7 +14,7 @@ The recommended online path is Docker deployment on Railway, Render, Fly.io, or 
 - Old generated files are cleaned automatically using:
   - `CLEANUP_MAX_AGE_HOURS`, default `6`
   - `CLEANUP_INTERVAL_SECONDS`, default `1800`
-- The active Demucs model is controlled with `DEMUCS_MODEL`, default `0d19c1c6` for lower memory on Railway.
+- The active Demucs model is controlled with `DEMUCS_MODEL`, default `6b9c2ca1` for the lowest-memory quantized model on Railway.
 - Demucs model files are cached into `DEMUCS_MODEL_REPO` during Docker build.
 
 ## Deploy To Railway
@@ -40,7 +40,7 @@ Use a paid/resource-capable service for real separation work. Demucs is CPU and 
 Suggested environment variables:
 
 ```text
-DEMUCS_MODEL=0d19c1c6
+DEMUCS_MODEL=6b9c2ca1
 DEMUCS_MODEL_REPO=/app/model_repo
 DEMUCS_SHIFTS=0
 DEMUCS_SEGMENT=1
